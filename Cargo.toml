@@ -15,6 +15,9 @@ sha2 = "0.10.9"
 [package.metadata.capi.header]
 name = "hash"
 
+[package.metadata.capi.install.include]
+asset = [{from="compat/*.h", to="librash"}]
+
 [package.metadata.capi.library]
 name = "rash"
 #version_suffix_components = 3
