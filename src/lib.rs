@@ -86,8 +86,8 @@ pub unsafe extern "C" fn rash_digest_init(
 
 /// EVP_DigestUpdate
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rash_digest_update(ctx: *mut RashCtx, buf: *const u8, n: usize) {
-    let buf = unsafe { slice::from_raw_parts(buf, n) };
+pub unsafe extern "C" fn rash_digest_update(ctx: *mut RashCtx, buf: *const c_char, n: usize) {
+    let buf = unsafe { slice::from_raw_parts(buf as *const u8, n) };
     match unsafe { &mut *ctx } {
         RashCtx::Uninitialized => (),
         RashCtx::Sha256(sha256) => sha256.update(buf),
