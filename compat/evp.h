@@ -8,6 +8,7 @@
 #define EVP_get_digestbyname rash_digestbyname
 #define EVP_MD_CTX_new rash_ctx_new
 #define EVP_DigestInit_ex rash_digest_init
+#define EVP_DigestInit_ex2 rash_digest_init2
 #define EVP_DigestUpdate rash_digest_update
 #define EVP_DigestFinal_ex rash_digest_final
 #define EVP_MD_CTX_free rash_ctx_free

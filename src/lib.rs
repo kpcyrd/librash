@@ -1,6 +1,6 @@
 #![allow(clippy::missing_safety_doc)] // for now
 
-use core::ffi::{CStr, c_char, c_uint, c_void};
+use core::ffi::{CStr, c_char, c_int, c_uint, c_void};
 use core::mem;
 use core::ptr;
 use core::slice;
@@ -32,6 +32,17 @@ pub enum RashCtx {
     Sha512(Sha512),
     Sha1(Sha1),
     Md5(Md5),
+}
+
+impl From<RashDigest> for RashCtx {
+    fn from(digest: RashDigest) -> Self {
+        match digest {
+            RashDigest::Sha256 => RashCtx::Sha256(Sha256::new()),
+            RashDigest::Sha512 => RashCtx::Sha512(Sha512::new()),
+            RashDigest::Sha1 => RashCtx::Sha1(Sha1::new()),
+            RashDigest::Md5 => RashCtx::Md5(Md5::new()),
+        }
+    }
 }
 
 /// EVP_get_digestbyname
@@ -67,14 +78,7 @@ pub extern "C" fn rash_ctx_new() -> *mut RashCtx {
 /// EVP_MD_CTX_reset
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rash_ctx_reset(ctx: *mut RashCtx) {
-    let digest = match unsafe { &mut *ctx } {
-        RashCtx::Uninitialized => return,
-        RashCtx::Sha256(_sha256) => RashDigest::Sha256,
-        RashCtx::Sha512(_sha512) => RashDigest::Sha512,
-        RashCtx::Sha1(_sha1) => RashDigest::Sha1,
-        RashCtx::Md5(_md5) => RashDigest::Md5,
-    };
-    unsafe { rash_digest_init(ctx, &digest, ptr::null()) };
+    unsafe { *ctx = RashCtx::Uninitialized };
 }
 
 /// EVP_DigestInit_ex
@@ -83,35 +87,64 @@ pub unsafe extern "C" fn rash_digest_init(
     ctx: *mut RashCtx,
     digest: *const RashDigest,
     _engine: *const c_void,
-) {
-    let new = match unsafe { *digest } {
-        RashDigest::Sha256 => RashCtx::Sha256(Sha256::new()),
-        RashDigest::Sha512 => RashCtx::Sha512(Sha512::new()),
-        RashDigest::Sha1 => RashCtx::Sha1(Sha1::new()),
-        RashDigest::Md5 => RashCtx::Md5(Md5::new()),
-    };
+) -> c_int {
+    let new = RashCtx::from(unsafe { *digest });
     unsafe { *ctx = new };
+    1
+}
+
+/// EVP_DigestInit_ex2
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rash_digest_init2(
+    ctx: *mut RashCtx,
+    digest: *const RashDigest,
+    _params: *const c_void,
+) -> c_int {
+    let digest = if let Some(digest) = unsafe { digest.as_ref() } {
+        *digest
+    } else {
+        match unsafe { &*ctx } {
+            RashCtx::Uninitialized => return 0,
+            RashCtx::Sha256(_sha256) => RashDigest::Sha256,
+            RashCtx::Sha512(_sha512) => RashDigest::Sha512,
+            RashCtx::Sha1(_sha1) => RashDigest::Sha1,
+            RashCtx::Md5(_md5) => RashDigest::Md5,
+        }
+    };
+
+    let new = RashCtx::from(digest);
+    unsafe { *ctx = new };
+    1
 }
 
 /// EVP_DigestUpdate
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rash_digest_update(ctx: *mut RashCtx, buf: *const c_char, n: usize) {
+pub unsafe extern "C" fn rash_digest_update(
+    ctx: *mut RashCtx,
+    buf: *const c_char,
+    n: usize,
+) -> c_int {
     let buf = unsafe { slice::from_raw_parts(buf as *const u8, n) };
     match unsafe { &mut *ctx } {
-        RashCtx::Uninitialized => (),
+        RashCtx::Uninitialized => return 0,
         RashCtx::Sha256(sha256) => sha256.update(buf),
         RashCtx::Sha512(sha512) => sha512.update(buf),
         RashCtx::Sha1(sha1) => sha1.update(buf),
         RashCtx::Md5(md5) => md5.update(buf),
     }
+    1
 }
 
 /// EVP_DigestFinal_ex
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rash_digest_final(ctx: *mut RashCtx, output: *mut u8, len: *mut c_uint) {
+pub unsafe extern "C" fn rash_digest_final(
+    ctx: *mut RashCtx,
+    output: *mut u8,
+    len: *mut c_uint,
+) -> c_int {
     let ctx = mem::take(unsafe { &mut *ctx });
     let n = match ctx {
-        RashCtx::Uninitialized => 0,
+        RashCtx::Uninitialized => return 0,
         RashCtx::Sha256(sha256) => {
             let len = Sha256::output_size();
             let output = unsafe { slice::from_raw_parts_mut(output, len) };
@@ -138,6 +171,7 @@ pub unsafe extern "C" fn rash_digest_final(ctx: *mut RashCtx, output: *mut u8, l
         }
     };
     unsafe { *len = n as c_uint };
+    1
 }
 
 /// EVP_MD_CTX_free
