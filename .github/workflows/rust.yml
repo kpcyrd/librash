@@ -76,6 +76,8 @@ jobs:
         prog:
           - file: contrib/example-openssl.c
             args: -I . -I pkgdir/usr/include -L pkgdir/usr/lib -l rash
+          - file: contrib/example-openssl3.c
+            args: -I . -I pkgdir/usr/include -L pkgdir/usr/lib -l rash
           - file: contrib/example-rash.c
             args: -I pkgdir/usr/include -L pkgdir/usr/lib -l rash
     steps:
