@@ -1,0 +1,158 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: read # needed while the repo is private
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - name: ubuntu-24.04
+            install: |
+              curl -L \
+                https://github.com/lu-zero/cargo-c/releases/latest/download/cargo-c-x86_64-unknown-linux-musl.tar.gz \
+                | tar xz -C ~/.cargo/bin
+          - name: macos-latest
+            install: brew install cargo-c
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+
+    - name: Set up cargo cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo-release-
+
+    - name: Install dependencies
+      run: ${{ matrix.os.install }}
+
+    - name: Build
+      run: cargo cbuild --release
+
+    - name: Install
+      run: cargo cinstall --release --frozen --prefix /usr --libdir lib --destdir pkgdir
+
+    - name: Upload files
+      uses: actions/upload-artifact@v4
+      with:
+        name: bin-${{ matrix.os.name }}
+        path: pkgdir
+
+  integration-test:
+    needs: build
+    runs-on: ${{ matrix.os.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - name: ubuntu-24.04
+            cc: gcc
+            ld_path: LD_LIBRARY_PATH
+          - name: macos-latest
+            cc: clang
+            ld_path: DYLD_LIBRARY_PATH
+        prog:
+          - file: contrib/example-openssl.c
+            args: -I . -I pkgdir/usr/include -L pkgdir/usr/lib -l rash
+          - file: contrib/example-rash.c
+            args: -I pkgdir/usr/include -L pkgdir/usr/lib -l rash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: bin-${{ matrix.os.name }}
+          path: pkgdir
+
+      - name: List contents
+        run: find .
+      - name: Compile mdtest
+        run: ${{ matrix.os.cc }} -o mdtest ${{matrix.prog.file }} ${{ matrix.prog.args }}
+
+      - name: Run mdtest (sha256)
+        run: ./mdtest sha256
+        env:
+          "${{ matrix.os.ld_path }}": pkgdir/usr/lib
+      - name: Run mdtest (sha1)
+        run: ./mdtest sha1
+        env:
+          "${{ matrix.os.ld_path }}": pkgdir/usr/lib
+      - name: Run mdtest (md5)
+        run: ./mdtest md5
+        env:
+          "${{ matrix.os.ld_path }}": pkgdir/usr/lib
+
+  unit-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+
+    - name: Set up cargo cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-debug-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo-debug-
+
+    - name: Run clippy
+      run: cargo clippy --all -- -D warnings
+    - name: Run tests
+      run: cargo test --verbose
+
+  deny:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Run cargo deny
+      run: |
+        docker run --rm -v "$PWD:/src" -w /src alpine:edge sh -c '
+        set -e
+        apk add cargo cargo-deny
+        exec cargo deny check
+        '
+
+  fmt:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Run cargo fmt
+      run: cargo fmt --all -- --check

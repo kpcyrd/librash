@@ -35,7 +35,9 @@ pub enum RashCtx {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rash_digestbyname(name: *const c_char) -> *const RashDigest {
     let name = unsafe { CStr::from_ptr(name) };
-    let Ok(digest) = name.to_str() else { return ptr::null() };
+    let Ok(digest) = name.to_str() else {
+        return ptr::null();
+    };
 
     let digest: &'static RashDigest = if digest.eq_ignore_ascii_case("SHA256") {
         &SHA256
@@ -59,7 +61,7 @@ pub extern "C" fn rash_ctx_new() -> *mut RashCtx {
 
 /// EVP_MD_CTX_reset
 #[unsafe(no_mangle)]
-pub extern "C" fn rash_ctx_reset(ctx: *mut RashCtx) {
+pub unsafe extern "C" fn rash_ctx_reset(ctx: *mut RashCtx) {
     let digest = match unsafe { &mut *ctx } {
         RashCtx::Uninitialized => return,
         RashCtx::Sha256(_sha256) => RashDigest::Sha256,
