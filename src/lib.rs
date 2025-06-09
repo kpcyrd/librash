@@ -37,17 +37,17 @@ pub unsafe extern "C" fn rash_digestbyname(name: *const c_char) -> *const RashDi
     let name = unsafe { CStr::from_ptr(name) };
     let Ok(digest) = name.to_str() else { return ptr::null() };
 
-    let digest = if digest.eq_ignore_ascii_case("SHA256") {
-        SHA256
+    let digest: &'static RashDigest = if digest.eq_ignore_ascii_case("SHA256") {
+        &SHA256
     } else if digest.eq_ignore_ascii_case("SHA1") {
-        SHA1
+        &SHA1
     } else if digest.eq_ignore_ascii_case("MD5") {
-        MD5
+        &MD5
     } else {
         return ptr::null();
     };
 
-    &digest as *const RashDigest
+    digest as *const RashDigest
 }
 
 /// EVP_MD_CTX_new
