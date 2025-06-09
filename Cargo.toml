@@ -24,5 +24,5 @@ name = "rash"
 rustflags = ["-Cpanic=abort"]
 
 [package.metadata.capi.pkg_config]
-name = "rash"
-filename = "rash"
+name = "librash"
+filename = "librash"
