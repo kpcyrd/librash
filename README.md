@@ -14,11 +14,24 @@ load both into the same process without having conflicting symbols.
 
 ## Build instructions
 
-```
+```sh
 cargo cbuild --release
 ## optional
 #cargo ctest
 cargo cinstall --release --frozen --prefix /usr --destdir /tmp/some-place
+```
+
+## Compiling example code
+
+```sh
+# Compile the library and generate headers
+cargo cinstall --release --frozen --prefix /usr --destdir pkgdir/
+# Using librash function names
+gcc -o mdtest contrib/example-librash.c -I pkgdir/usr/include -L pkgdir/usr/lib/ -lrash
+# Using OpenSSL function names and compat header
+#gcc -o mdtest contrib/example-openssl3.c -I . -I pkgdir/usr/include -L pkgdir/usr/lib/ -lrash
+# Test the binary
+LD_LIBRARY_PATH=pkgdir/usr/lib ./mdtest sha256
 ```
 
 ## License

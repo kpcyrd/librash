@@ -78,7 +78,7 @@ jobs:
             args: -I . -I pkgdir/usr/include -L pkgdir/usr/lib -l rash
           - file: contrib/example-openssl3.c
             args: -I . -I pkgdir/usr/include -L pkgdir/usr/lib -l rash
-          - file: contrib/example-rash.c
+          - file: contrib/example-librash.c
             args: -I pkgdir/usr/include -L pkgdir/usr/lib -l rash
     steps:
       - uses: actions/checkout@v4
