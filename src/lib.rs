@@ -7,11 +7,12 @@ use core::slice;
 use digest::Digest;
 use md5::Md5;
 use sha1::Sha1;
-use sha2::Sha256;
+use sha2::{Sha256, Sha512};
 
 #[derive(Clone, Copy)]
 pub enum RashDigest {
     Sha256,
+    Sha512,
     Sha1,
     Md5,
 }
@@ -19,6 +20,7 @@ pub enum RashDigest {
 pub const RASH_MAX_DIGEST_SIZE: usize = 64; /* SHA512 */
 
 static SHA256: RashDigest = RashDigest::Sha256;
+static SHA512: RashDigest = RashDigest::Sha512;
 static SHA1: RashDigest = RashDigest::Sha1;
 static MD5: RashDigest = RashDigest::Md5;
 
@@ -27,6 +29,7 @@ pub enum RashCtx {
     #[default]
     Uninitialized,
     Sha256(Sha256),
+    Sha512(Sha512),
     Sha1(Sha1),
     Md5(Md5),
 }
@@ -41,6 +44,8 @@ pub unsafe extern "C" fn rash_digestbyname(name: *const c_char) -> *const RashDi
 
     let digest: &'static RashDigest = if digest.eq_ignore_ascii_case("SHA256") {
         &SHA256
+    } else if digest.eq_ignore_ascii_case("SHA512") {
+        &SHA512
     } else if digest.eq_ignore_ascii_case("SHA1") {
         &SHA1
     } else if digest.eq_ignore_ascii_case("MD5") {
@@ -65,6 +70,7 @@ pub unsafe extern "C" fn rash_ctx_reset(ctx: *mut RashCtx) {
     let digest = match unsafe { &mut *ctx } {
         RashCtx::Uninitialized => return,
         RashCtx::Sha256(_sha256) => RashDigest::Sha256,
+        RashCtx::Sha512(_sha512) => RashDigest::Sha512,
         RashCtx::Sha1(_sha1) => RashDigest::Sha1,
         RashCtx::Md5(_md5) => RashDigest::Md5,
     };
@@ -80,6 +86,7 @@ pub unsafe extern "C" fn rash_digest_init(
 ) {
     let new = match unsafe { *digest } {
         RashDigest::Sha256 => RashCtx::Sha256(Sha256::new()),
+        RashDigest::Sha512 => RashCtx::Sha512(Sha512::new()),
         RashDigest::Sha1 => RashCtx::Sha1(Sha1::new()),
         RashDigest::Md5 => RashCtx::Md5(Md5::new()),
     };
@@ -93,6 +100,7 @@ pub unsafe extern "C" fn rash_digest_update(ctx: *mut RashCtx, buf: *const c_cha
     match unsafe { &mut *ctx } {
         RashCtx::Uninitialized => (),
         RashCtx::Sha256(sha256) => sha256.update(buf),
+        RashCtx::Sha512(sha512) => sha512.update(buf),
         RashCtx::Sha1(sha1) => sha1.update(buf),
         RashCtx::Md5(md5) => md5.update(buf),
     }
@@ -108,6 +116,12 @@ pub unsafe extern "C" fn rash_digest_final(ctx: *mut RashCtx, output: *mut u8, l
             let len = Sha256::output_size();
             let output = unsafe { slice::from_raw_parts_mut(output, len) };
             sha256.finalize_into(output.into());
+            len
+        }
+        RashCtx::Sha512(sha512) => {
+            let len = Sha512::output_size();
+            let output = unsafe { slice::from_raw_parts_mut(output, len) };
+            sha512.finalize_into(output.into());
             len
         }
         RashCtx::Sha1(sha1) => {
@@ -147,7 +161,9 @@ mod tests {
     #[test]
     fn test_sha256() {
         let digest = unsafe { rash_digestbyname(c"SHA256".as_ptr()) };
+        assert!(!digest.is_null());
         let ctx = rash_ctx_new();
+        assert!(!ctx.is_null());
         unsafe { rash_digest_init(ctx, digest, ptr::null()) };
         unsafe { rash_digest_update(ctx, b"hello ".as_ptr() as *const c_char, 6) };
         unsafe { rash_digest_update(ctx, b"world".as_ptr() as *const c_char, 5) };
@@ -165,9 +181,33 @@ mod tests {
     }
 
     #[test]
+    fn test_sha512() {
+        let digest = unsafe { rash_digestbyname(c"sha512".as_ptr()) };
+        assert!(!digest.is_null());
+        let ctx = rash_ctx_new();
+        assert!(!ctx.is_null());
+        unsafe { rash_digest_init(ctx, digest, ptr::null()) };
+        unsafe { rash_digest_update(ctx, b"hello ".as_ptr() as *const c_char, 6) };
+        unsafe { rash_digest_update(ctx, b"world".as_ptr() as *const c_char, 5) };
+
+        let mut len = 0u32;
+        let mut buf = [0u8; 64];
+        unsafe { rash_digest_final(ctx, buf.as_mut_ptr(), &mut len as *mut u32) };
+        assert_eq!(len, 64);
+        assert_eq!(
+            &buf,
+            b"\x30\x9e\xcc\x48\x9c\x12\xd6\xeb\x4c\xc4\x0f\x50\xc9\x02\xf2\xb4\xd0\xed\x77\xee\x51\x1a\x7c\x7a\x9b\xcd\x3c\xa8\x6d\x4c\xd8\x6f\x98\x9d\xd3\x5b\xc5\xff\x49\x96\x70\xda\x34\x25\x5b\x45\xb0\xcf\xd8\x30\xe8\x1f\x60\x5d\xcf\x7d\xc5\x54\x2e\x93\xae\x9c\xd7\x6f"
+        );
+
+        unsafe { rash_ctx_free(ctx) };
+    }
+
+    #[test]
     fn test_sha1() {
         let digest = unsafe { rash_digestbyname(c"SHA1".as_ptr()) };
+        assert!(!digest.is_null());
         let ctx = rash_ctx_new();
+        assert!(!ctx.is_null());
         unsafe { rash_digest_init(ctx, digest, ptr::null()) };
         unsafe { rash_digest_update(ctx, b"hello ".as_ptr() as *const c_char, 6) };
         unsafe { rash_digest_update(ctx, b"world".as_ptr() as *const c_char, 5) };
@@ -187,7 +227,9 @@ mod tests {
     #[test]
     fn test_md5() {
         let digest = unsafe { rash_digestbyname(c"MD5".as_ptr()) };
+        assert!(!digest.is_null());
         let ctx = rash_ctx_new();
+        assert!(!ctx.is_null());
         unsafe { rash_digest_init(ctx, digest, ptr::null()) };
         unsafe { rash_digest_update(ctx, b"hello ".as_ptr() as *const c_char, 6) };
         unsafe { rash_digest_update(ctx, b"world".as_ptr() as *const c_char, 5) };

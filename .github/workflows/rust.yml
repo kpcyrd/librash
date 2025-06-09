@@ -97,6 +97,10 @@ jobs:
         run: ./mdtest sha256
         env:
           "${{ matrix.os.ld_path }}": pkgdir/usr/lib
+      - name: Run mdtest (sha512)
+        run: ./mdtest SHA512
+        env:
+          "${{ matrix.os.ld_path }}": pkgdir/usr/lib
       - name: Run mdtest (sha1)
         run: ./mdtest sha1
         env:
