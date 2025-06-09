@@ -147,11 +147,13 @@ mod tests {
         let digest = unsafe { rash_digestbyname(c"SHA256".as_ptr()) };
         let ctx = rash_ctx_new();
         unsafe { rash_digest_init(ctx, digest, ptr::null()) };
-        unsafe { rash_digest_update(ctx, b"hello ".as_ptr(), 6) };
-        unsafe { rash_digest_update(ctx, b"world".as_ptr(), 5) };
+        unsafe { rash_digest_update(ctx, b"hello ".as_ptr() as *const c_char, 6) };
+        unsafe { rash_digest_update(ctx, b"world".as_ptr() as *const c_char, 5) };
 
+        let mut len = 0u32;
         let mut buf = [0u8; 32];
-        unsafe { rash_digest_final(ctx, buf.as_mut_ptr(), ptr::null()) };
+        unsafe { rash_digest_final(ctx, buf.as_mut_ptr(), &mut len as *mut u32) };
+        assert_eq!(len, 32);
         assert_eq!(
             &buf,
             b"\xb9\x4d\x27\xb9\x93\x4d\x3e\x08\xa5\x2e\x52\xd7\xda\x7d\xab\xfa\xc4\x84\xef\xe3\x7a\x53\x80\xee\x90\x88\xf7\xac\xe2\xef\xcd\xe9"
@@ -165,11 +167,13 @@ mod tests {
         let digest = unsafe { rash_digestbyname(c"SHA1".as_ptr()) };
         let ctx = rash_ctx_new();
         unsafe { rash_digest_init(ctx, digest, ptr::null()) };
-        unsafe { rash_digest_update(ctx, b"hello ".as_ptr(), 6) };
-        unsafe { rash_digest_update(ctx, b"world".as_ptr(), 5) };
+        unsafe { rash_digest_update(ctx, b"hello ".as_ptr() as *const c_char, 6) };
+        unsafe { rash_digest_update(ctx, b"world".as_ptr() as *const c_char, 5) };
 
+        let mut len = 0u32;
         let mut buf = [0u8; 20];
-        unsafe { rash_digest_final(ctx, buf.as_mut_ptr(), ptr::null()) };
+        unsafe { rash_digest_final(ctx, buf.as_mut_ptr(), &mut len as *mut u32) };
+        assert_eq!(len, 20);
         assert_eq!(
             &buf,
             b"\x2a\xae\x6c\x35\xc9\x4f\xcf\xb4\x15\xdb\xe9\x5f\x40\x8b\x9c\xe9\x1e\xe8\x46\xed"
@@ -183,11 +187,13 @@ mod tests {
         let digest = unsafe { rash_digestbyname(c"MD5".as_ptr()) };
         let ctx = rash_ctx_new();
         unsafe { rash_digest_init(ctx, digest, ptr::null()) };
-        unsafe { rash_digest_update(ctx, b"hello ".as_ptr(), 6) };
-        unsafe { rash_digest_update(ctx, b"world".as_ptr(), 5) };
+        unsafe { rash_digest_update(ctx, b"hello ".as_ptr() as *const c_char, 6) };
+        unsafe { rash_digest_update(ctx, b"world".as_ptr() as *const c_char, 5) };
 
+        let mut len = 0u32;
         let mut buf = [0u8; 16];
-        unsafe { rash_digest_final(ctx, buf.as_mut_ptr(), ptr::null()) };
+        unsafe { rash_digest_final(ctx, buf.as_mut_ptr(), &mut len as *mut u32) };
+        assert_eq!(len, 16);
         assert_eq!(
             &buf,
             b"\x5e\xb6\x3b\xbb\xe0\x1e\xee\xd0\x93\xcb\x22\xbb\x8f\x5a\xcd\xc3"
